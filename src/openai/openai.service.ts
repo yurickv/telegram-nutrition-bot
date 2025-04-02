@@ -13,10 +13,17 @@ export class OpenAIService {
 
     systemPromt = ``;
 
-    async generateMealPlan(userData: string): Promise<string> {
+    async generateMealPlan(userData: number): Promise<string> {
         const response = await this.openai.chat.completions.create({
             model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: `Склади денне меню для користувача з параметрами: ${userData}` }],
+            messages: [
+                {
+                    role: 'system',
+                    content:
+                        'Ти AI-дієтолог. Генеруй корисне меню для здоворого харчування відповідно до параметрів користувача.\n Меню подай списками на 3-4 прийоми їжї із вказанням калорійності страв і їх вагою.\n 80% калорійності слід зїдати в першій половині дня.\n Денну потребу в калоріях ти отримаєш в повідомленні від <user>.\nДостимуйся строго наданій калорійності, не допускай відхилень.',
+                },
+                { role: 'user', content: `Склади денне меню з калорійністю: ${userData} ккал` },
+            ],
             max_tokens: 600,
         });
 
