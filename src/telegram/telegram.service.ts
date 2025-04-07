@@ -5,6 +5,7 @@ import { OpenAIService } from '../openai/openai.service';
 import { UserService } from 'src/user/user.service';
 import { calculateCalories } from '../utils/calcColories';
 import { padRight } from 'src/utils/formatViewButton';
+import { User } from 'src/user/user.schema';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -31,6 +32,7 @@ export class TelegramService implements OnModuleInit {
                     sex: true,
                     activity: 1.2,
                     goal: 'maintain',
+                    amountMenu: 0,
                 });
                 this.bot.sendMessage(msg.chat.id, 'Привіт! Я AI-дієтолог. Введи свої дані: вага, зріст, ціль.');
                 setTimeout(() => this.askWeight(msg.chat.id), 2000);
@@ -62,9 +64,9 @@ export class TelegramService implements OnModuleInit {
 
             try {
                 // Send a loading message
+                const user = await this.userService.findByChatId(chatId);
                 const loadingMessage = await this.bot.sendMessage(chatId, 'Зачекайте, готуємо меню...');
 
-                const user = await this.userService.findByChatId(chatId);
                 if (!user) {
                     this.processingUsers.delete(chatId);
                     return this.bot.sendMessage(
@@ -85,6 +87,20 @@ export class TelegramService implements OnModuleInit {
                     chat_id: chatId,
                     message_id: loadingMessage.message_id,
                 });
+                const updateData: Partial<User> = {};
+                if (typeof user.amountMenu !== 'number') {
+                    updateData.amountMenu = 0;
+                } else {
+                    updateData.amountMenu = user.amountMenu + 1;
+                }
+
+                if (!user?.firstInit) {
+                    updateData.firstInit = new Date();
+                }
+
+                if (Object.keys(updateData).length > 0) {
+                    await this.userService.updateUser(chatId, updateData);
+                }
             } catch (error) {
                 console.error('Error generating meal plan:', error);
                 this.bot.sendMessage(chatId, 'Виникла помилка при створенні меню. Спробуйте пізніше.');

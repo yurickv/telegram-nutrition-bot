@@ -31,6 +31,12 @@ export class User {
 
     @Prop({ type: [String], default: [] })
     dislikedFoods: string[];
+
+    @Prop()
+    firstInit: Date;
+
+    @Prop()
+    amountMenu: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
