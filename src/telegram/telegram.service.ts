@@ -4,10 +4,12 @@ import * as TelegramBot from 'node-telegram-bot-api';
 import { OpenAIService } from '../openai/openai.service';
 import { UserService } from 'src/user/user.service';
 import { calculateCalories } from '../utils/calcColories';
+import { padRight } from 'src/utils/formatViewButton';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
     private bot: TelegramBot;
+    processingUsers = new Set<number>();
 
     constructor(
         private configService: ConfigService,
@@ -48,36 +50,138 @@ export class TelegramService implements OnModuleInit {
         this.bot.onText(/\/edit/, (msg) => this.askWeight(msg.chat.id));
 
         this.bot.onText(/\/menu/, async (msg) => {
-            const user = await this.userService.findByChatId(msg.chat.id);
-            if (!user) {
-                return this.bot.sendMessage(
-                    msg.chat.id,
-                    'Будь ласка, введіть свої дані командою /start перед отриманням меню.',
-                );
+            const chatId = msg.chat.id;
+
+            // Check if the user is already in the process of generating a menu
+            if (this.processingUsers.has(chatId)) {
+                return; // Ignore if the user is already processing a request
             }
-            const calories = calculateCalories(user);
-            const mealPlan = await this.openAIService.generateMealPlan(calories);
-            this.bot.sendMessage(msg.chat.id, `Твоє меню на день:\n${mealPlan}`);
+
+            // Mark the user as processing
+            this.processingUsers.add(chatId);
+
+            try {
+                // Send a loading message
+                const loadingMessage = await this.bot.sendMessage(chatId, 'Зачекайте, готуємо меню...');
+
+                const user = await this.userService.findByChatId(chatId);
+                if (!user) {
+                    this.processingUsers.delete(chatId);
+                    return this.bot.sendMessage(
+                        chatId,
+                        'Будь ласка, введіть свої дані командою /start перед отриманням меню.',
+                    );
+                }
+
+                // Calculate calories and generate the meal plan
+                const calories = calculateCalories(user);
+                const mealPlan = await this.openAIService.generateMealPlan(
+                    calories,
+                    user.favoriteFoods,
+                    user.dislikedFoods,
+                );
+
+                this.bot.editMessageText(`Твоє меню на день:\n${mealPlan}`, {
+                    chat_id: chatId,
+                    message_id: loadingMessage.message_id,
+                });
+            } catch (error) {
+                console.error('Error generating meal plan:', error);
+                this.bot.sendMessage(chatId, 'Виникла помилка при створенні меню. Спробуйте пізніше.');
+            } finally {
+                this.processingUsers.delete(chatId);
+            }
         });
+
         this.bot.onText(/\/add_favorite/, (msg) => this.handleFavoriteFoods(msg.chat.id));
         this.bot.onText(/\/del_food/, (msg) => this.handleDislikedFoods(msg.chat.id));
+
+        this.bot.on('callback_query', async (callbackQuery) => {
+            const msg = callbackQuery.message;
+            const chatId = msg.chat.id;
+            const data = callbackQuery.data;
+
+            if (data.startsWith('remove_fav:')) {
+                const food = data.split(':')[1];
+                await this.userService.removeFavoriteFood(chatId, food);
+                this.bot.answerCallbackQuery(callbackQuery.id, { text: `${food} видалено.` });
+                this.handleFavoriteFoods(chatId);
+            } else if (data === 'add_fav') {
+                this.promptAddFavoriteFoods(chatId);
+                this.bot.answerCallbackQuery(callbackQuery.id);
+            } else if (data.startsWith('remove_dis:')) {
+                const food = data.split(':')[1];
+                await this.userService.removeDislikedFood(chatId, food);
+                this.bot.answerCallbackQuery(callbackQuery.id, { text: `${food} видалено.` });
+                this.handleDislikedFoods(chatId);
+            } else if (data === 'add_dis') {
+                this.promptAddDislikedFoods(chatId);
+                this.bot.answerCallbackQuery(callbackQuery.id);
+            }
+        });
     }
 
     private async handleFavoriteFoods(chatId: number) {
         const user = await this.userService.findByChatId(chatId);
-        const existing = user?.favoriteFoods?.join(', ') || '';
-        const prompt = existing
-            ? `Ваші улюблені продукти: ${existing}.
-Додайте нові через кому:`
-            : 'Введіть ваші улюблені продукти через кому:';
+        const foods = user?.favoriteFoods || [];
 
-        this.bot.sendMessage(chatId, prompt);
+        if (foods.length > 0) {
+            const inlineKeyboard = foods.map((food) => [
+                {
+                    text: padRight(food),
+                    callback_data: `remove_fav:${food}`,
+                },
+            ]);
+            inlineKeyboard.push([{ text: '➕ Додати нові', callback_data: 'add_fav' }]);
+
+            await this.bot.sendMessage(chatId, 'Ваші улюблені продукти:', {
+                reply_markup: { inline_keyboard: inlineKeyboard },
+            });
+        } else {
+            this.promptAddFavoriteFoods(chatId);
+        }
+    }
+
+    private async handleDislikedFoods(chatId: number) {
+        const user = await this.userService.findByChatId(chatId);
+        const foods = user?.dislikedFoods || [];
+
+        if (foods.length > 0) {
+            const inlineKeyboard = foods.map((food) => [
+                {
+                    text: padRight(food),
+                    callback_data: `remove_dis:${food}`,
+                },
+            ]);
+            inlineKeyboard.push([{ text: '➕ Додати нові', callback_data: 'add_dis' }]);
+
+            await this.bot.sendMessage(chatId, 'Ваші небажані продукти:', {
+                reply_markup: { inline_keyboard: inlineKeyboard },
+            });
+        } else {
+            this.promptAddDislikedFoods(chatId);
+        }
+    }
+
+    private promptAddFavoriteFoods(chatId: number) {
+        this.bot.sendMessage(chatId, 'Введіть ваші улюблені продукти через кому (макс. 30 символів кожен):');
         const listener = async (msg: TelegramBot.Message) => {
             if (msg.chat.id !== chatId) return;
             const newFoods = msg.text
                 .split(',')
                 .map((f) => f.trim())
                 .filter(Boolean);
+
+            // Validate food names (max 30 characters)
+            const invalidFoods = newFoods.filter((food) => food.length > 30);
+            if (invalidFoods.length > 0) {
+                this.bot.sendMessage(
+                    chatId,
+                    `Наступні продукти занадто довгі: ${invalidFoods.join(', ')}. Вони повинні бути не більше 30 символів.`,
+                );
+                return;
+            }
+
             await this.userService.addFavoriteFoods(chatId, newFoods);
             this.bot.sendMessage(chatId, 'Улюблені продукти оновлено.');
             this.bot.removeListener('message', listener);
@@ -85,21 +189,25 @@ export class TelegramService implements OnModuleInit {
         this.bot.on('message', listener);
     }
 
-    private async handleDislikedFoods(chatId: number) {
-        const user = await this.userService.findByChatId(chatId);
-        const existing = user?.dislikedFoods?.join(', ') || '';
-        const prompt = existing
-            ? `Ваші небажані продукти: ${existing}.
-Додайте нові через кому:`
-            : 'Введіть ваші небажані продукти через кому:';
-
-        this.bot.sendMessage(chatId, prompt);
+    private promptAddDislikedFoods(chatId: number) {
+        this.bot.sendMessage(chatId, 'Введіть ваші небажані продукти через кому (макс. 30 символів кожен):');
         const listener = async (msg: TelegramBot.Message) => {
             if (msg.chat.id !== chatId) return;
             const newFoods = msg.text
                 .split(',')
                 .map((f) => f.trim())
                 .filter(Boolean);
+
+            // Validate food names (max 30 characters)
+            const invalidFoods = newFoods.filter((food) => food.length > 30);
+            if (invalidFoods.length > 0) {
+                this.bot.sendMessage(
+                    chatId,
+                    `Наступні продукти занадто довгі: ${invalidFoods.join(', ')}. Вони повинні бути не більше 30 символів.`,
+                );
+                return;
+            }
+
             await this.userService.addDislikedFoods(chatId, newFoods);
             this.bot.sendMessage(chatId, 'Небажані продукти оновлено.');
             this.bot.removeListener('message', listener);

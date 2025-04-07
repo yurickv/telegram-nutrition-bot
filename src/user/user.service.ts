@@ -28,4 +28,11 @@ export class UserService {
             .findOneAndUpdate({ chatId }, { $addToSet: { dislikedFoods: { $each: foods } } }, { new: true })
             .exec();
     }
+    async removeFavoriteFood(chatId: number, food: string) {
+        await this.userModel.findOneAndUpdate({ chatId }, { $pull: { favoriteFoods: food } }, { new: true }).exec();
+    }
+
+    async removeDislikedFood(chatId: number, food: string) {
+        await this.userModel.findOneAndUpdate({ chatId }, { $pull: { dislikedFoods: food } }, { new: true }).exec();
+    }
 }

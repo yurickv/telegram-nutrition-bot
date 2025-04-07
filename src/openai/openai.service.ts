@@ -13,7 +13,7 @@ export class OpenAIService {
 
     systemPromt = ``;
 
-    async generateMealPlan(userData: number): Promise<string> {
+    async generateMealPlan(userData: number, favoriteFoods: string[], dislikedFoods: string[]): Promise<string> {
         const response = await this.openai.chat.completions.create({
             model: 'gpt-3.5-turbo',
             messages: [
@@ -27,7 +27,12 @@ export class OpenAIService {
                         Перелік страв оформляй ✅, також по тексту додавай відповідні емоджі (наприклад їжі в стравах: 🍎🍌🍗🥩🐟🥕🥦🍳🧀🥗 і тому подібне).
                         Періоди прийому їжі пиши великими літерами, наприклад: СНІДАНОК, ОБІД, ВЕЧЕРЯ)`,
                 },
-                { role: 'user', content: `Склади денне меню з калорійністю: ${userData} ккал` },
+                {
+                    role: 'user',
+                    content: `Склади денне меню з калорійністю: ${userData} ккал. Не допускай відхилень в калорійності. 
+                    По можливості включай ці продукти в меню: ${favoriteFoods}
+                    Виключи ці продукти з меню: ${dislikedFoods}`,
+                },
             ],
             max_tokens: 600,
         });
