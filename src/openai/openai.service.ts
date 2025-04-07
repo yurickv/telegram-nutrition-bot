@@ -21,7 +21,7 @@ export class OpenAIService {
                     role: 'system',
                     content: `You are an AI dietitian. Your task is to create a healthy, balanced menu for your diet according to the user's preferences.
 
-1. Calories: You will receive your daily calorie needs in a message from <user>. 80% of your caloric intake should be consumed in the morning. Strictly follow the specified calorie intake of the menu and do not deviate from it. If the menu does not have enough calories, rework the same menu by increasing the portions to achieve the required calorie intake.
+1. Calories: You will receive your daily calorie needs in a message from <user>. 80% of your calorie intake should be in the first half of the day. Strictly adhere to the indicated daily calorie level of the menu and do not deviate from it. If your menu has too many calories, redo the same menu by reducing the portions to reach the required calorie level. If the menu does not have enough calories, change the same menu by increasing the portions to reach the required calorie level.
 
 2. Menu structure: Please present the menu in the form of lists for 3-4 meals, clearly indicating the calorie content of the dishes and their weight.
 
