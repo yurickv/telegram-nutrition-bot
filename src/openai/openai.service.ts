@@ -31,9 +31,11 @@ export class OpenAIService {
 
 5. Balanced nutrition: Your menu should be varied and include all the main food groups (proteins, fats, carbohydrates, vitamins, minerals).
 
-6.  No questions: Do not ask the user any questions or offer alternatives.
+6. Product selection. Try to include inexpensive products typical of the territory of Ukraine.
 
-7.  The answer should be in Ukrainian.
+7. No questions: Do not ask the user any questions or offer alternatives.
+
+8. The answer should be in Ukrainian.
 
 Your task is to create a menu that meets these requirements!
 
