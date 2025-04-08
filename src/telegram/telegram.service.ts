@@ -19,8 +19,14 @@ export class TelegramService implements OnModuleInit {
     ) {}
 
     async onModuleInit() {
+        // const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+        // this.bot = new TelegramBot(token, { polling: true });
+
         const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
-        this.bot = new TelegramBot(token, { polling: true });
+        const domain = this.configService.get<string>('RENDER_EXTERNAL_URL');
+
+        this.bot = new TelegramBot(token, { webHook: { port: false } });
+        await this.bot.setWebHook(`${domain}/bot`);
 
         this.bot.onText(/\/start/, async (msg) => {
             let user = await this.userService.findByChatId(msg.chat.id);
@@ -135,6 +141,9 @@ export class TelegramService implements OnModuleInit {
                 this.bot.answerCallbackQuery(callbackQuery.id);
             }
         });
+    }
+    getBot() {
+        return this.bot;
     }
 
     private async handleFavoriteFoods(chatId: number) {
