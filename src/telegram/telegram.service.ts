@@ -19,14 +19,15 @@ export class TelegramService implements OnModuleInit {
     ) {}
 
     async onModuleInit() {
-        // const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
-        // this.bot = new TelegramBot(token, { polling: true });
-
         const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
         const domain = this.configService.get<string>('RENDER_EXTERNAL_URL');
 
-        this.bot = new TelegramBot(token, { webHook: { port: false } });
-        await this.bot.setWebHook(`${domain}/bot`);
+        if (this.configService.get<string>('NODE_ENV') === 'development') {
+            this.bot = new TelegramBot(token, { polling: true });
+        } else {
+            this.bot = new TelegramBot(token, { webHook: { port: false } });
+            await this.bot.setWebHook(`${domain}/bot`);
+        }
 
         this.bot.onText(/\/start/, async (msg) => {
             let user = await this.userService.findByChatId(msg.chat.id);
@@ -129,7 +130,8 @@ export class TelegramService implements OnModuleInit {
                 this.bot.answerCallbackQuery(callbackQuery.id, { text: `${food} видалено.` });
                 this.handleFavoriteFoods(chatId);
             } else if (data === 'add_fav') {
-                this.promptAddFavoriteFoods(chatId);
+                // this.promptAddFavoriteFoods(chatId);
+                this.promptAddFoods(chatId, 'favorite');
                 this.bot.answerCallbackQuery(callbackQuery.id);
             } else if (data.startsWith('remove_dis:')) {
                 const food = data.split(':')[1];
@@ -137,7 +139,8 @@ export class TelegramService implements OnModuleInit {
                 this.bot.answerCallbackQuery(callbackQuery.id, { text: `${food} видалено.` });
                 this.handleDislikedFoods(chatId);
             } else if (data === 'add_dis') {
-                this.promptAddDislikedFoods(chatId);
+                // this.promptAddDislikedFoods(chatId);
+                this.promptAddFoods(chatId, 'disliked');
                 this.bot.answerCallbackQuery(callbackQuery.id);
             }
         });
@@ -178,6 +181,31 @@ export class TelegramService implements OnModuleInit {
         await this.bot.sendMessage(chatId, 'Ваші небажані продукти:', {
             reply_markup: { inline_keyboard: inlineKeyboard },
         });
+    }
+    private promptAddFoods(chatId: number, type: 'favorite' | 'disliked') {
+        const label = type === 'favorite' ? 'улюблені' : 'небажані';
+        const addMethod = type === 'favorite' ? this.userService.addFavoriteFoods : this.userService.addDislikedFoods;
+        this.bot.sendMessage(chatId, `Введіть ваші ${label} продукти через кому (макс. 30 символів кожен):`);
+
+        const listener = async (msg: TelegramBot.Message) => {
+            if (msg.chat.id !== chatId) return;
+            const newFoods = msg.text
+                .split(',')
+                .map((f) => f.trim())
+                .filter(Boolean);
+            const invalidFoods = newFoods.filter((f) => f.length > 30);
+
+            if (invalidFoods.length > 0) {
+                this.bot.sendMessage(chatId, `Занадто довгі: ${invalidFoods.join(', ')}`);
+                return;
+            }
+
+            await addMethod.call(this.userService, chatId, newFoods);
+            this.bot.sendMessage(chatId, `${label.charAt(0).toUpperCase() + label.slice(1)} продукти оновлено.`);
+            this.bot.removeListener('message', listener);
+        };
+
+        this.bot.on('message', listener);
     }
 
     private promptAddFavoriteFoods(chatId: number) {
