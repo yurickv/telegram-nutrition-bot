@@ -29,12 +29,10 @@ export class TelegramService implements OnModuleInit {
     async onModuleInit() {
         const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
         const domain = this.configService.get<string>('RENDER_EXTERNAL_URL');
-        this.bot =
-            this.configService.get<string>('NODE_ENV') === 'development'
-                ? new TelegramBot(token, { polling: true })
-                : new TelegramBot(token, { webHook: { port: false } });
-
-        if (this.configService.get<string>('NODE_ENV') !== 'development') {
+        if (this.configService.get<string>('NODE_ENV') === 'development') {
+            this.bot = new TelegramBot(token, { polling: true });
+        } else {
+            this.bot = new TelegramBot(token, { webHook: { port: false } });
             await this.bot.setWebHook(`${domain}/bot`);
         }
 
