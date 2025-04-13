@@ -90,8 +90,8 @@ Your task is to create a menu that meets these requirements!
                     Виключи ці продукти з меню: ${dislikedFoods}`,
                 },
             ],
-            max_tokens: 600,
-            temperature: 0.7,
+            max_tokens: 1000,
+            temperature: 0.9,
         });
 
         const content = response.choices[0]?.message?.content;
