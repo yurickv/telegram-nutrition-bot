@@ -15,7 +15,7 @@ export class OpenAIService {
 
     async generateMealPlan(userData: number, favoriteFoods: string[], dislikedFoods: string[]): Promise<string> {
         const response = await this.openai.chat.completions.create({
-            model: 'gpt-3.5-turbo',
+            model: 'gpt-4.1-mini',
             messages: [
                 {
                     role: 'system',
