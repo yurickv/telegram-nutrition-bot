@@ -53,9 +53,12 @@ export class TelegramService implements OnModuleInit {
 
         commandHandler(/\/start/, async (msg) => {
             const chatId = msg.chat.id;
+            const username = msg.from?.username || '';
             const user = await this.userService.findByChatId(chatId);
+
             if (!user) {
                 await this.userService.createOrUpdateUser(chatId, {
+                    username,
                     weight: 0,
                     height: 0,
                     age: 0,
@@ -64,12 +67,16 @@ export class TelegramService implements OnModuleInit {
                     goal: 'maintain',
                     amountMenu: 0,
                 });
+
                 this.bot.sendMessage(chatId, 'Привіт! Я AI-дієтолог. Введи свої дані: вага, зріст, ціль.');
                 setTimeout(
                     () => this.onboarding.askWeight(this.bot, chatId, (s) => this.setUserState(chatId, s)),
                     1000,
                 );
             } else {
+                if (user.username !== username) {
+                    await this.userService.updateUser(chatId, { username });
+                }
                 this.confirm.confirmData(this.bot, chatId);
             }
         });
@@ -84,11 +91,23 @@ export class TelegramService implements OnModuleInit {
             const chatId = msg.chat.id;
             if (this.processingUsers.has(chatId)) return;
             this.processingUsers.add(chatId);
+
             try {
                 const user = await this.userService.findByChatId(chatId);
                 if (!user || !isUserDataValid(user)) {
                     return this.bot.sendMessage(chatId, 'Щоб отримати меню, спершу завершіть анкету командою /edit');
                 }
+
+                const now = new Date();
+                const last = user.lastMenuRequest ? new Date(user.lastMenuRequest) : null;
+                const isSameDay = last && now.toDateString() === last.toDateString();
+
+                const amountToday = isSameDay ? user.amountMenuToday || 0 : 0;
+
+                if (amountToday >= 15) {
+                    return this.bot.sendMessage(chatId, '❗️Ви вже отримали 15 меню сьогодні. Спробуйте завтра.');
+                }
+
                 const loading = await this.bot.sendMessage(chatId, 'Готуємо меню...');
                 const calories = calculateCalories(user);
                 const mealPlan = await this.openAIService.generateMealPlan(
@@ -96,9 +115,16 @@ export class TelegramService implements OnModuleInit {
                     user.favoriteFoods,
                     user.dislikedFoods,
                 );
+
                 this.bot.editMessageText(`Твоє меню на день:\n${mealPlan}`, {
                     chat_id: chatId,
                     message_id: loading.message_id,
+                });
+
+                await this.userService.updateUser(chatId, {
+                    amountMenu: (user.amountMenu || 0) + 1,
+                    amountMenuToday: amountToday + 1,
+                    lastMenuRequest: now,
                 });
             } catch (err) {
                 console.error('Menu error:', err);

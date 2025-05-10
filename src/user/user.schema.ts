@@ -7,6 +7,8 @@ export type UserDocument = User & Document;
 export class User {
     @Prop({ required: true, unique: true })
     chatId: number;
+    @Prop()
+    username: string;
 
     @Prop()
     weight: number;
@@ -35,8 +37,15 @@ export class User {
     @Prop()
     firstInit: Date;
 
+    @Prop({ type: Object, default: {} })
+    surveyCompleted: { [key: string]: boolean };
+
     @Prop()
     amountMenu: number;
+    @Prop()
+    amountMenuToday: number;
+    @Prop()
+    lastMenuRequest: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
