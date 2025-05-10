@@ -13,7 +13,7 @@ import * as utc from 'dayjs/plugin/utc';
 dayjs.extend(utc);
 dayjs.extend(tz);
 
-type SurveySession = {
+interface SurveySession {
     stepIndex: number;
     answers: string[];
     collected: Record<string, string[]>;
@@ -21,11 +21,12 @@ type SurveySession = {
     onMessage: (msg: TelegramBot.Message) => void;
     onCallback: (query: TelegramBot.CallbackQuery) => void;
     timeout: NodeJS.Timeout;
-};
+}
 
 @Injectable()
 export class SurveyService {
     private sessions = new Map<number, SurveySession>();
+    private MAX_SESSIONS = 1000;
 
     constructor(
         @InjectModel(User.name) private userModel: Model<UserDocument>,
@@ -35,6 +36,17 @@ export class SurveyService {
 
     async onModuleInit() {
         cron.schedule('*/30 * * * *', () => this.checkAndSendSurveys());
+    }
+
+    private cleanOldestSessionIfLimitExceeded() {
+        if (this.sessions.size >= this.MAX_SESSIONS) {
+            const firstKey = this.sessions.keys().next().value;
+            const session = this.sessions.get(firstKey);
+            if (session) {
+                clearTimeout(session.timeout);
+                this.sessions.delete(firstKey);
+            }
+        }
     }
 
     async checkAndSendSurveys() {
@@ -56,6 +68,7 @@ export class SurveyService {
     }
 
     async startSurveySession(user: UserDocument) {
+        this.cleanOldestSessionIfLimitExceeded();
         const bot = this.telegramService.getBot();
         const chatId = user.chatId;
 
@@ -120,7 +133,7 @@ export class SurveyService {
             user,
             onMessage: () => {},
             onCallback: () => {},
-            timeout: setTimeout(() => this.forceFinishSurvey(session), 15 * 60 * 1000), // ⏱ 15 хв
+            timeout: setTimeout(() => this.forceFinishSurvey(session), 15 * 60 * 1000),
         };
 
         const sendStep = async () => {
@@ -132,18 +145,14 @@ export class SurveyService {
                 return;
             }
 
-            let buttons: TelegramBot.InlineKeyboardButton[][] = [];
+            const buttons = (step.options || []).map((opt) => {
+                const label = typeof opt === 'string' ? opt : opt.label;
+                const value = typeof opt === 'string' ? opt : opt.value;
+                return [{ text: label, callback_data: `survey:${chatId}:${session.stepIndex}:${value}` }];
+            });
 
-            if (step.options) {
-                buttons = step.options.map((opt) => {
-                    const label = typeof opt === 'string' ? opt : opt.label;
-                    const value = typeof opt === 'string' ? opt : opt.value;
-                    return [{ text: label, callback_data: `survey:${chatId}:${session.stepIndex}:${value}` }];
-                });
-
-                if (step.multiple) {
-                    buttons.push([{ text: '✅ Готово', callback_data: `survey:${chatId}:${session.stepIndex}:done` }]);
-                }
+            if (step.multiple) {
+                buttons.push([{ text: '✅ Готово', callback_data: `survey:${chatId}:${session.stepIndex}:done` }]);
             }
 
             await bot.sendMessage(chatId, step.question, {
@@ -157,7 +166,7 @@ export class SurveyService {
             if (!data?.startsWith('survey:')) return;
 
             const [, idStr, stepStr, value] = data.split(':');
-            if (Number(idStr) !== chatId || Number(stepStr) !== session.stepIndex) return;
+            if (+idStr !== chatId || +stepStr !== session.stepIndex) return;
 
             const step = steps[session.stepIndex];
             const isMultiple = step.multiple ?? false;
@@ -171,8 +180,6 @@ export class SurveyService {
                     if (!session.collected[step.key].includes(value)) {
                         session.collected[step.key].push(value);
                         await bot.answerCallbackQuery(query.id, { text: '✅ Обрано' });
-                    } else {
-                        await bot.answerCallbackQuery(query.id, { text: 'Вже вибрано' });
                     }
                 }
             } else {
@@ -236,6 +243,6 @@ export class SurveyService {
         user.surveyCompleted = { ...(user.surveyCompleted || {}), survey1: true };
         await user.save();
 
-        await bot.sendMessage(user.chatId, '⌛️ Час на опитування вийшов. Збережено надані відповіді. Дякуємо!');
+        await bot.sendMessage(user.chatId, '⌛️ Час на опитування вийшов. Збережено надані відповіді.');
     }
 }
