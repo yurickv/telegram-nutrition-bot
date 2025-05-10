@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { TelegramService } from '../telegram/telegram.service';
-import { GoogleSheetService } from './google-sheet.service';
+import { GoogleSheetService } from '../googleServices/google-sheet.service';
 import { User, UserDocument } from '../user/user.schema';
 import TelegramBot from 'node-telegram-bot-api';
 import * as dayjs from 'dayjs';

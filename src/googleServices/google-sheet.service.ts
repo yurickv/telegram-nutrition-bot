@@ -1,38 +1,3 @@
-// import { Injectable } from '@nestjs/common';
-// import { google } from 'googleapis';
-// import { User } from '../user/user.schema';
-
-// @Injectable()
-// export class GoogleSheetService {
-//     private sheets;
-
-//     constructor() {
-//         const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-//         const SERVICE_ACCOUNT_PRIVATE_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY!.replace(/\\n/g, '\n');
-
-//         const auth = new google.auth.GoogleAuth({
-//             credentials: {
-//                 client_email: SERVICE_ACCOUNT_EMAIL,
-//                 private_key: SERVICE_ACCOUNT_PRIVATE_KEY,
-//             },
-//             scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-//         });
-
-//         this.sheets = google.sheets({ version: 'v4', auth });
-//     }
-
-//     async writeSurveyAnswers(user: User, answers: string[]) {
-//         const spreadsheetId = '1jFSbwCRhA5XRcUAuka6aoWSOuV_FrnnAACggPB-Zhyc';
-//         const row = [new Date().toISOString(), user.chatId, user.sex ? 'Чоловік' : 'Жінка', user.age ?? '', ...answers];
-
-//         await this.sheets.spreadsheets.values.append({
-//             spreadsheetId,
-//             range: 'Survey1!A1',
-//             valueInputOption: 'USER_ENTERED',
-//             requestBody: { values: [row] },
-//         });
-//     }
-// }
 import { Injectable } from '@nestjs/common';
 import { google } from 'googleapis';
 import { User } from '../user/user.schema';

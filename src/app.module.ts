@@ -4,8 +4,8 @@ import { OpenAIService } from './openai/openai.service';
 import { DatabaseModule } from './database/database.module';
 import { UserModule } from './user/user.module';
 import { TelegramModule } from './telegram/telegram.module';
-import { SurveyService } from './services/survey.service';
-import { GoogleSheetService } from './services/google-sheet.service';
+import { SurveyService } from './survey/survey.service';
+import { GoogleSheetService } from './googleServices/google-sheet.service';
 
 @Module({
     imports: [ConfigModule.forRoot(), DatabaseModule, UserModule, TelegramModule],
