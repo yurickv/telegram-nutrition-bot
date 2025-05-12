@@ -9,6 +9,7 @@ import { FoodPreferenceService } from './food/food-preference.service';
 import { FoodInputService } from './food/food-input.service';
 import { isUserDataValid } from 'src/utils/validateUserData';
 import { calculateCalories } from 'src/utils/calcColories';
+import { User } from 'src/user/user.schema';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -121,12 +122,17 @@ export class TelegramService implements OnModuleInit {
                     message_id: loading.message_id,
                 });
 
-                await this.userService.updateUser(chatId, {
+                const updateData: Partial<User> = {
                     amountMenu: (user.amountMenu || 0) + 1,
                     amountMenuToday: amountToday + 1,
                     lastMenuRequest: now,
-                    ...(user.firstInit ? {} : { firstInit: now }),
-                });
+                };
+
+                if (!user.firstInit) {
+                    updateData.firstInit = now;
+                }
+
+                await this.userService.updateUser(chatId, updateData);
             } catch (err) {
                 console.error('Menu error:', err);
                 this.bot.sendMessage(chatId, 'Помилка при створенні меню.');
