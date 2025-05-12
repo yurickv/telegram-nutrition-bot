@@ -35,7 +35,7 @@ export class SurveyService {
     ) {}
 
     async onModuleInit() {
-        cron.schedule('*/30 * * * *', () => this.checkAndSendSurveys());
+        cron.schedule('*/45 * * * *', () => this.checkAndSendSurveys());
     }
 
     private cleanOldestSessionIfLimitExceeded() {
@@ -133,7 +133,7 @@ export class SurveyService {
             user,
             onMessage: () => {},
             onCallback: () => {},
-            timeout: setTimeout(() => this.forceFinishSurvey(session), 15 * 60 * 1000),
+            timeout: setTimeout(() => this.forceFinishSurvey(session), 10 * 60 * 1000),
         };
 
         const sendStep = async () => {

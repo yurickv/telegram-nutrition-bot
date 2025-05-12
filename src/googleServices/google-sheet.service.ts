@@ -43,15 +43,16 @@ export class GoogleSheetService {
             m5: 'Інтерактивне меню в боті',
         };
 
-        const selectedFeatures = answers[4]
-            .split(',')
-            .map((code) => featureMap[code.trim()] || code.trim())
-            .join(', ');
+        const formatSelections = (answer: string, map: Record<string, string>, noSelectionMessage: string): string =>
+            answer?.length > 0
+                ? answer
+                      .split(',')
+                      .map((code) => map[code.trim()] || code.trim())
+                      .join(', ')
+                : noSelectionMessage;
 
-        const selectedFormats = answers[5]
-            .split(',')
-            .map((code) => formatMap[code.trim()] || code.trim())
-            .join(', ');
+        const selectedFeatures = formatSelections(answers[4], featureMap, 'No features selected');
+        const selectedFormats = formatSelections(answers[5], formatMap, 'No formats selected');
 
         const row = [
             new Date().toISOString(),
