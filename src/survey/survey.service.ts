@@ -35,7 +35,7 @@ export class SurveyService {
     ) {}
 
     async onModuleInit() {
-        cron.schedule('*/45 * * * *', () => this.checkAndSendSurveys());
+        cron.schedule('0 */3 * * *', () => this.checkAndSendSurveys());
     }
 
     private cleanOldestSessionIfLimitExceeded() {
@@ -133,7 +133,7 @@ export class SurveyService {
             user,
             onMessage: () => {},
             onCallback: () => {},
-            timeout: setTimeout(() => this.forceFinishSurvey(session), 10 * 60 * 1000),
+            timeout: setTimeout(() => this.forceFinishSurvey(session), 50 * 60 * 1000),
         };
 
         const sendStep = async () => {
@@ -240,7 +240,7 @@ export class SurveyService {
         this.sessions.delete(user.chatId);
 
         await this.googleSheetService.writeSurveyAnswers(user, answers);
-        user.surveyCompleted = { ...(user.surveyCompleted || {}), survey1: true };
+        user.surveyCompleted = { ...(user.surveyCompleted || {}), survey1: false };
         await user.save();
 
         await bot.sendMessage(user.chatId, '⌛️ Час на опитування вийшов. Збережено надані відповіді.');
