@@ -125,6 +125,7 @@ export class TelegramService implements OnModuleInit {
                     amountMenu: (user.amountMenu || 0) + 1,
                     amountMenuToday: amountToday + 1,
                     lastMenuRequest: now,
+                    ...(user.firstInit ? {} : { firstInit: now }),
                 });
             } catch (err) {
                 console.error('Menu error:', err);
