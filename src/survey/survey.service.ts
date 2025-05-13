@@ -228,7 +228,11 @@ export class SurveyService {
         user.surveyCompleted = { ...(user.surveyCompleted || {}), survey1: true };
         await user.save();
 
-        await bot.sendMessage(user.chatId, '✅ Дякуємо! Опитування завершено.');
+        await bot.sendMessage(user.chatId, '✅ Дякуємо! Опитування завершено.', {
+            reply_markup: {
+                remove_keyboard: true,
+            },
+        });
     }
 
     private async forceFinishSurvey(session: SurveySession) {
@@ -243,6 +247,10 @@ export class SurveyService {
         user.surveyCompleted = { ...(user.surveyCompleted || {}), survey1: false };
         await user.save();
 
-        await bot.sendMessage(user.chatId, '⌛️ Час на опитування вийшов. Збережено надані відповіді.');
+        await bot.sendMessage(user.chatId, '⌛️ Час на опитування вийшов. Збережено надані відповіді.', {
+            reply_markup: {
+                remove_keyboard: true,
+            },
+        });
     }
 }
