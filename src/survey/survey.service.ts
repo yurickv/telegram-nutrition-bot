@@ -9,6 +9,7 @@ import * as dayjs from 'dayjs';
 import * as cron from 'node-cron';
 import * as tz from 'dayjs/plugin/timezone';
 import * as utc from 'dayjs/plugin/utc';
+import { UserService } from 'src/user/user.service';
 
 dayjs.extend(utc);
 dayjs.extend(tz);
@@ -20,6 +21,7 @@ interface SurveySession {
     user: UserDocument;
     onMessage: (msg: TelegramBot.Message) => void;
     onCallback: (query: TelegramBot.CallbackQuery) => void;
+    createdAt: number;
     timeout: NodeJS.Timeout;
 }
 
@@ -32,10 +34,17 @@ export class SurveyService {
         @InjectModel(User.name) private userModel: Model<UserDocument>,
         private readonly telegramService: TelegramService,
         private readonly googleSheetService: GoogleSheetService,
+        private userService: UserService,
     ) {}
 
+    // cron.schedule('* * * * *', () => this.checkAndSendSurveys());
     async onModuleInit() {
-        cron.schedule('0 */3 * * *', () => this.checkAndSendSurveys());
+        this.setupSessionCleanup();
+        cron.schedule('0 */5 * * *', () => this.checkAndSendSurveys());
+
+        // const data = await this.userService.findByChatId(7456685492);
+        // console.log(data);
+        // if (data) this.startSurveySession(data);
     }
 
     private cleanOldestSessionIfLimitExceeded() {
@@ -48,17 +57,31 @@ export class SurveyService {
             }
         }
     }
+    private setupSessionCleanup() {
+        cron.schedule('*/50 * * * *', () => {
+            const now = Date.now();
+            const TTL = 10 * 60 * 1000;
+
+            for (const [chatId, session] of this.sessions.entries()) {
+                const age = now - session.createdAt;
+
+                if (age > TTL) {
+                    console.log(`⚠️ Видалення завислої сесії: chatId=${chatId}`);
+                    clearTimeout(session.timeout);
+                    this.sessions.delete(chatId);
+                }
+            }
+        });
+    }
 
     async checkAndSendSurveys() {
         const nowKyiv = dayjs().tz('Europe/Kyiv');
         const hour = nowKyiv.hour();
         if (hour < 8 || hour >= 20) return;
-
         const users = await this.userModel.find({
             firstInit: { $exists: true },
             $or: [{ surveyCompleted: { $exists: false } }, { 'surveyCompleted.survey1': { $ne: true } }],
         });
-
         for (const user of users) {
             const daysPassed = dayjs().diff(dayjs(user.firstInit), 'day');
             if (daysPassed >= 2 && !this.sessions.has(user.chatId)) {
@@ -71,11 +94,13 @@ export class SurveyService {
         this.cleanOldestSessionIfLimitExceeded();
         const bot = this.telegramService.getBot();
         const chatId = user.chatId;
-
         const steps = [
             {
                 key: 'rateCalories',
-                question: '1️⃣ Оцініть "Розрахунок калорій"',
+                question: `Допоможіть покращити цей сервіс!
+                Пройдіть коротке опитування
+
+                1️⃣ Оцініть "Розрахунок калорій"`,
                 options: ['1', '2', '3', '4', '5'],
             },
             {
@@ -133,7 +158,8 @@ export class SurveyService {
             user,
             onMessage: () => {},
             onCallback: () => {},
-            timeout: setTimeout(() => this.forceFinishSurvey(session), 50 * 60 * 1000),
+            createdAt: Date.now(),
+            timeout: setTimeout(() => this.forceFinishSurvey(session), 40 * 60 * 1000),
         };
 
         const sendStep = async () => {
@@ -175,6 +201,7 @@ export class SurveyService {
                 if (value === 'done') {
                     session.answers.push((session.collected[step.key] || []).join(', '));
                     session.stepIndex++;
+
                     await sendStep();
                 } else {
                     if (!session.collected[step.key].includes(value)) {
@@ -201,6 +228,7 @@ export class SurveyService {
 
             session.answers.push(msg.text);
             session.stepIndex++;
+
             await sendStep();
 
             if (session.stepIndex >= steps.length) {
@@ -236,9 +264,9 @@ export class SurveyService {
     }
 
     private async forceFinishSurvey(session: SurveySession) {
-        const { user, answers, onMessage, onCallback } = session;
+        const { user, answers, onMessage, onCallback, timeout } = session;
         const bot = this.telegramService.getBot();
-
+        clearTimeout(timeout);
         bot.removeListener('callback_query', onCallback);
         bot.removeListener('message', onMessage);
         this.sessions.delete(user.chatId);
