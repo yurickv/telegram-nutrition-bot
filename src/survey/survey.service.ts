@@ -39,9 +39,8 @@ export class SurveyService {
 
     // cron.schedule('* * * * *', () => this.checkAndSendSurveys());
     async onModuleInit() {
-        this.setupSessionCleanup();
-        cron.schedule('0 */5 * * *', () => this.checkAndSendSurveys());
-
+        // this.setupSessionCleanup();
+        // cron.schedule('0 */5 * * *', () => this.checkAndSendSurveys());
         // const data = await this.userService.findByChatId(7456685492);
         // console.log(data);
         // if (data) this.startSurveySession(data);
