@@ -39,4 +39,32 @@ export class UserService {
     async removeDislikedFood(chatId: number, food: string) {
         await this.userModel.findOneAndUpdate({ chatId }, { $pull: { dislikedFoods: food } }, { new: true }).exec();
     }
+
+    async findAllPaginated(
+        page = 1,
+        limit = 10,
+    ): Promise<{
+        data: UserDocument[];
+        total: number;
+        page: number;
+        limit: number;
+    }> {
+        const skip = (page - 1) * limit;
+
+        const [data, total] = await Promise.all([
+            this.userModel.find().skip(skip).limit(limit).exec(),
+            this.userModel.countDocuments(),
+        ]);
+
+        return {
+            data,
+            total,
+            page,
+            limit,
+        };
+    }
+    async deleteUser(chatId: number): Promise<{ deleted: boolean }> {
+        const result = await this.userModel.deleteOne({ chatId }).exec();
+        return { deleted: result.deletedCount === 1 };
+    }
 }
