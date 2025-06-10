@@ -3,9 +3,9 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
-    const allowedOrigins = ['http://localhost:5173', 'https://admin-page-nutri-day.vercel.app/'];
+    const allowedOrigins = ['http://localhost:5173', 'https://admin-page-nutri-day.vercel.app'];
 
-    app.enableCors({
+    https: app.enableCors({
         origin: (origin, callback) => {
             if (!origin || allowedOrigins.includes(origin)) {
                 callback(null, true);
