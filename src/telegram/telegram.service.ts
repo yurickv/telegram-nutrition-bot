@@ -49,6 +49,7 @@ export class TelegramService implements OnModuleInit {
             { command: '/edit', description: 'Редагувати дані' },
             { command: '/add_favorite', description: 'Додати улюблені продукти' },
             { command: '/del_food', description: 'Виключити небажані продукти' },
+            { command: '/feedback', description: 'Написати розробнику' },
         ]);
 
         const commandHandler = (regex: RegExp, handler: (msg: TelegramBot.Message) => void) => {
@@ -113,6 +114,14 @@ export class TelegramService implements OnModuleInit {
         commandHandler(/\/menu/, async (msg) => {
             await this.sendMenu(msg.chat.id);
         });
+        commandHandler(/\/feedback/, (msg) => {
+            const chatId = msg.chat.id;
+            this.setUserState(chatId, 'waiting_for_feedback');
+            this.bot.sendMessage(
+                chatId,
+                '✍️ Напишіть про свої труднощі в роботі бота або побажання для нових функцій (до 300 символів):',
+            );
+        });
 
         this.bot.on('message', async (msg) => {
             const chatId = msg.chat.id;
@@ -130,7 +139,7 @@ export class TelegramService implements OnModuleInit {
             if (text === 'ℹ️ Допомога') {
                 return this.bot.sendMessage(
                     chatId,
-                    `📊 Врахування калорійності — це ключ🔧 та основа❗ до ефективного схуднення або набору ваги.
+                    `📊 Врахування калорійності❗— це ключ🔧 до ефективного схуднення або набору ваги.
 
 🥗 Меню складається з урахуванням принципів:
 ✅ Здорового 🧠 харчування  
@@ -144,16 +153,12 @@ export class TelegramService implements OnModuleInit {
 ➖ Вкажи їх у списку *небажаних продуктів* через /del\\_food
 
 📌 *Доступні команди:*
-
 _Перевірити свої дані_ /start
-
-_Змінити свої дані_ /edit
-
+_Змінити дані_ /edit
 _Отримати нове меню_ /menu
-
 _Додати улюблені продукти / страви в меню_ /add\\_favorite
-
 _Виключити продукти / страви з меню_  /del\\_food
+Відгук або побажання /feedback
 `,
                     {
                         parse_mode: 'Markdown',
@@ -182,6 +187,20 @@ _Виключити продукти / страви з меню_  /del\\_food
                     return this.foodInput.handleFoodInput(this.bot, chatId, text, 'disliked', () =>
                         this.clearUserState(chatId),
                     );
+                case 'waiting_for_feedback':
+                    const feedback = msg.text?.trim();
+                    if (!feedback || feedback.length > 300) {
+                        return this.bot.sendMessage(
+                            chatId,
+                            '⚠️ Повідомлення повинне містити до 300 символів. Спробуйте ще раз.',
+                        );
+                    }
+                    await this.bot.sendMessage(
+                        7456685492,
+                        `📨 Новий фідбек від @${msg.from?.username || 'невідомо'}:\n\n${feedback}`,
+                    );
+                    this.bot.sendMessage(chatId, '✅ Дякуємо! Ваше повідомлення надіслано розробнику.');
+                    return this.clearUserState(chatId);
             }
         });
 
