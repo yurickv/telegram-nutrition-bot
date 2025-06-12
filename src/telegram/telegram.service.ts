@@ -17,6 +17,12 @@ export class TelegramService implements OnModuleInit {
     private processingUsers = new Set<number>();
     private userStates = new Map<number, string>();
 
+    private mainKeyboard: TelegramBot.ReplyKeyboardMarkup = {
+        keyboard: [[{ text: '📋 Меню' }, { text: 'ℹ️ Допомога' }]],
+        resize_keyboard: true,
+        one_time_keyboard: false,
+    };
+
     constructor(
         private configService: ConfigService,
         private userService: UserService,
@@ -69,7 +75,10 @@ export class TelegramService implements OnModuleInit {
                     amountMenu: 0,
                 });
 
-                this.bot.sendMessage(chatId, 'Привіт! Я AI-дієтолог. Введи свої дані: вага, зріст, ціль.');
+                this.bot.sendMessage(chatId, 'Привіт! Я AI-дієтолог. Введи свої дані: вага, зріст, ціль.', {
+                    reply_markup: this.mainKeyboard,
+                });
+
                 setTimeout(
                     () => this.onboarding.askWeight(this.bot, chatId, (s) => this.setUserState(chatId, s)),
                     1000,
@@ -78,66 +87,101 @@ export class TelegramService implements OnModuleInit {
                 if (user.username !== username) {
                     await this.userService.updateUser(chatId, { username });
                 }
+
                 this.confirm.confirmData(this.bot, chatId);
+                setTimeout(
+                    () =>
+                        this.bot.sendMessage(chatId, 'Оберіть дію нижче:', {
+                            reply_markup: this.mainKeyboard,
+                        }),
+                    1000,
+                );
             }
         });
 
-        commandHandler(/\/edit/, (msg) =>
-            this.onboarding.askWeight(this.bot, msg.chat.id, (s) => this.setUserState(msg.chat.id, s)),
-        );
+        commandHandler(/\/edit/, (msg) => {
+            this.bot.sendMessage(msg.chat.id, 'Редагування даних. Почнемо з ваги:', {
+                reply_markup: this.mainKeyboard,
+            });
+            this.onboarding.askWeight(this.bot, msg.chat.id, (s) => this.setUserState(msg.chat.id, s));
+        });
+
         commandHandler(/\/add_favorite/, (msg) => this.foodPref.handleFavoriteFoods(this.bot, msg.chat.id));
+
         commandHandler(/\/del_food/, (msg) => this.foodPref.handleDislikedFoods(this.bot, msg.chat.id));
 
         commandHandler(/\/menu/, async (msg) => {
+            await this.sendMenu(msg.chat.id);
+        });
+
+        this.bot.on('message', async (msg) => {
             const chatId = msg.chat.id;
-            if (this.processingUsers.has(chatId)) return;
-            this.processingUsers.add(chatId);
+            const text = msg.text?.trim();
+            const state = this.userStates.get(chatId);
 
-            try {
-                const user = await this.userService.findByChatId(chatId);
-                if (!user || !isUserDataValid(user)) {
-                    return this.bot.sendMessage(chatId, 'Щоб отримати меню, спершу завершіть анкету командою /edit');
-                }
+            // If user entered a command, cancel state
+            if (text?.startsWith('/') && state) {
+                this.clearUserState(chatId);
+                return;
+            }
 
-                const now = new Date();
-                const last = user.lastMenuRequest ? new Date(user.lastMenuRequest) : null;
-                const isSameDay = last && now.toDateString() === last.toDateString();
+            // Handle persistent keyboard buttons
+            if (text === '📋 Меню') return await this.sendMenu(chatId);
+            if (text === 'ℹ️ Допомога') {
+                return this.bot.sendMessage(
+                    chatId,
+                    `📊 Врахування калорійності — це ключ🔧 та основа❗ до ефективного схуднення або набору ваги.
 
-                const amountToday = isSameDay ? user.amountMenuToday || 0 : 0;
+🥗 Меню складається з урахуванням принципів:
+✅ Здорового 🧠 харчування  
+✅ Балансу макроелементів  
+✅ Рекомендацій МОЗ України 🇺🇦
 
-                if (amountToday >= 15) {
-                    return this.bot.sendMessage(chatId, '❗️Ви вже отримали 15 меню сьогодні. Спробуйте завтра.');
-                }
+💡 Хочеш бачити улюблену страву в меню?
+➕ Додай її назву до списку *улюблених продуктів* через команду /add\\_favorite
 
-                const loading = await this.bot.sendMessage(chatId, 'Готуємо меню...');
-                const calories = calculateCalories(user);
-                const mealPlan = await this.openAIService.generateMealPlan(
-                    calories,
-                    user.favoriteFoods,
-                    user.dislikedFoods,
+🚫 Не хочеш бачити певні страви?
+➖ Вкажи їх у списку *небажаних продуктів* через /del\\_food
+
+📌 *Доступні команди:*
+
+_Перевірити свої дані_ /start
+
+_Змінити свої дані_ /edit
+
+_Отримати нове меню_ /menu
+
+_Додати улюблені продукти / страви в меню_ /add\\_favorite
+
+_Виключити продукти / страви з меню_  /del\\_food
+`,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: this.mainKeyboard,
+                    },
                 );
+            }
 
-                this.bot.editMessageText(`Твоє меню на день:\n${mealPlan}`, {
-                    chat_id: chatId,
-                    message_id: loading.message_id,
-                });
-
-                const updateData: Partial<User> = {
-                    amountMenu: (user.amountMenu || 0) + 1,
-                    amountMenuToday: amountToday + 1,
-                    lastMenuRequest: now,
-                };
-
-                if (!user.firstInit) {
-                    updateData.firstInit = now;
-                }
-
-                await this.userService.updateUser(chatId, updateData);
-            } catch (err) {
-                console.error('Menu error:', err);
-                this.bot.sendMessage(chatId, 'Помилка при створенні меню.');
-            } finally {
-                this.processingUsers.delete(chatId);
+            // Handle user input based on current state
+            switch (state) {
+                case 'waiting_for_weight':
+                    return this.onboarding.handleWeightInput(this.bot, chatId, text, (s) =>
+                        this.setUserState(chatId, s),
+                    );
+                case 'waiting_for_height':
+                    return this.onboarding.handleHeightInput(this.bot, chatId, text, (s) =>
+                        this.setUserState(chatId, s),
+                    );
+                case 'waiting_for_age':
+                    return this.onboarding.handleAgeInput(this.bot, chatId, text, (s) => this.setUserState(chatId, s));
+                case 'adding_favorite_foods':
+                    return this.foodInput.handleFoodInput(this.bot, chatId, text, 'favorite', () =>
+                        this.clearUserState(chatId),
+                    );
+                case 'adding_disliked_foods':
+                    return this.foodInput.handleFoodInput(this.bot, chatId, text, 'disliked', () =>
+                        this.clearUserState(chatId),
+                    );
             }
         });
 
@@ -172,38 +216,58 @@ export class TelegramService implements OnModuleInit {
                 this.bot.answerCallbackQuery(query.id);
             }
         });
+    }
 
-        this.bot.on('message', async (msg) => {
-            const chatId = msg.chat.id;
-            const state = this.userStates.get(chatId);
-            if (msg.text.startsWith('/') && state) {
-                this.clearUserState(chatId);
-                return;
+    private async sendMenu(chatId: number) {
+        if (this.processingUsers.has(chatId)) return;
+        this.processingUsers.add(chatId);
+
+        try {
+            const user = await this.userService.findByChatId(chatId);
+            if (!user || !isUserDataValid(user)) {
+                return this.bot.sendMessage(chatId, 'Щоб отримати меню, спершу завершіть анкету командою /edit');
             }
 
-            switch (state) {
-                case 'waiting_for_weight':
-                    return this.onboarding.handleWeightInput(this.bot, chatId, msg.text, (s) =>
-                        this.setUserState(chatId, s),
-                    );
-                case 'waiting_for_height':
-                    return this.onboarding.handleHeightInput(this.bot, chatId, msg.text, (s) =>
-                        this.setUserState(chatId, s),
-                    );
-                case 'waiting_for_age':
-                    return this.onboarding.handleAgeInput(this.bot, chatId, msg.text, (s) =>
-                        this.setUserState(chatId, s),
-                    );
-                case 'adding_favorite_foods':
-                    return this.foodInput.handleFoodInput(this.bot, chatId, msg.text, 'favorite', () =>
-                        this.clearUserState(chatId),
-                    );
-                case 'adding_disliked_foods':
-                    return this.foodInput.handleFoodInput(this.bot, chatId, msg.text, 'disliked', () =>
-                        this.clearUserState(chatId),
-                    );
+            const now = new Date();
+            const last = user.lastMenuRequest ? new Date(user.lastMenuRequest) : null;
+            const isSameDay = last && now.toDateString() === last.toDateString();
+
+            const amountToday = isSameDay ? user.amountMenuToday || 0 : 0;
+
+            if (amountToday >= 15) {
+                return this.bot.sendMessage(chatId, '❗️Ви вже отримали 15 меню сьогодні. Спробуйте завтра.');
             }
-        });
+
+            const loading = await this.bot.sendMessage(chatId, 'Готуємо меню...');
+            const calories = calculateCalories(user);
+            const mealPlan = await this.openAIService.generateMealPlan(
+                calories,
+                user.favoriteFoods,
+                user.dislikedFoods,
+            );
+
+            this.bot.editMessageText(`Твоє меню на день:\n${mealPlan}`, {
+                chat_id: chatId,
+                message_id: loading.message_id,
+            });
+
+            const updateData: Partial<User> = {
+                amountMenu: (user.amountMenu || 0) + 1,
+                amountMenuToday: amountToday + 1,
+                lastMenuRequest: now,
+            };
+
+            if (!user.firstInit) {
+                updateData.firstInit = now;
+            }
+
+            await this.userService.updateUser(chatId, updateData);
+        } catch (err) {
+            console.error('Menu error:', err);
+            this.bot.sendMessage(chatId, 'Помилка при створенні меню.');
+        } finally {
+            this.processingUsers.delete(chatId);
+        }
     }
 
     private setUserState(chatId: number, state: string | null) {
