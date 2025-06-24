@@ -13,13 +13,13 @@ export class OnboardingService {
 
     askWeight(bot: TelegramBot, chatId: number, setState: (state: string) => void) {
         setState('waiting_for_weight');
-        bot.sendMessage(chatId, 'Введи свою вагу (кг):');
+        bot.sendMessage(chatId, 'Введіть свою вагу (кг):');
     }
 
     async handleWeightInput(bot: TelegramBot, chatId: number, text: string, setState: (state: string) => void) {
         const val = Number(text.trim());
         if (isNaN(val) || val < 40 || val > 150) {
-            return bot.sendMessage(chatId, 'Введи число від 40 до 150.');
+            return bot.sendMessage(chatId, 'Введіть число від 40 до 150.');
         }
         await this.userService.updateUser(chatId, { weight: val });
         setState('');
@@ -28,13 +28,13 @@ export class OnboardingService {
 
     askHeight(bot: TelegramBot, chatId: number, setState: (state: string) => void) {
         setState('waiting_for_height');
-        bot.sendMessage(chatId, 'Введи свій ріст (см):');
+        bot.sendMessage(chatId, 'Введіть свій ріст (см):');
     }
 
     async handleHeightInput(bot: TelegramBot, chatId: number, text: string, setState: (state: string) => void) {
         const val = Number(text.trim());
         if (isNaN(val) || val < 100 || val > 220) {
-            return bot.sendMessage(chatId, 'Введи число від 100 до 220.');
+            return bot.sendMessage(chatId, 'Введіть число від 100 до 220.');
         }
         await this.userService.updateUser(chatId, { height: val });
         setState('');
@@ -43,13 +43,13 @@ export class OnboardingService {
 
     askAge(bot: TelegramBot, chatId: number, setState: (state: string) => void) {
         setState('waiting_for_age');
-        bot.sendMessage(chatId, 'Введи свій вік:');
+        bot.sendMessage(chatId, 'Введіть свій вік:');
     }
 
     async handleAgeInput(bot: TelegramBot, chatId: number, text: string, setState: (state: string) => void) {
         const val = Number(text.trim());
         if (isNaN(val) || val < 14 || val > 130) {
-            return bot.sendMessage(chatId, 'Введи число від 14 до 130.');
+            return bot.sendMessage(chatId, 'Введіть число від 14 до 130.');
         }
         await this.userService.updateUser(chatId, { age: val });
         setState('');
