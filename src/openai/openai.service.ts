@@ -37,7 +37,11 @@ export class OpenAIService {
 
 8. Process of cooking a dish. After the menu, add the recipe for all complex dishes for lunch and dinner (that have 3 or more ingredients). Write like a professional chef.
 
-8. The answer should be in Ukrainian.
+9. Avoid incompatible foods in the same meal (e.g. milk and cucumber)
+
+10. The dish name must be 30 characters or less.
+
+11. The answer should be in Ukrainian.
 
 Your task is to create a menu that meets these requirements!
 
