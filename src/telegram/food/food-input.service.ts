@@ -22,7 +22,12 @@ export class FoodInputService {
         const foods = text
             .split(',')
             .map((f) => f.trim())
-            .filter((f) => f.length && f.length <= 30);
+            .filter((f) => f.length)
+            .filter((f) => f.length <= 25)
+            .filter((f) => {
+                const prefix = type === 'favorite' ? 'remove_fav:' : 'remove_dis:';
+                return Buffer.byteLength(prefix + f, 'utf8') <= 64;
+            });
 
         if (!foods.length) {
             return bot.sendMessage(chatId, 'Немає допустимих продуктів.');

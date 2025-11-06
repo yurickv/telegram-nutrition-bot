@@ -11,7 +11,9 @@ export class FoodPreferenceService {
         const user = await this.userService.findByChatId(chatId);
         const foods = user?.favoriteFoods || [];
 
-        const inlineKeyboard = foods.map((food) => [{ text: padRight(food), callback_data: `remove_fav:${food}` }]);
+        const inlineKeyboard = foods.map((food, i) => [
+            { text: padRight(food), callback_data: `remove_fav_i:${i}` },
+        ]);
         inlineKeyboard.push([{ text: '➕ Додати нові', callback_data: 'add_fav' }]);
 
         bot.sendMessage(chatId, 'Ваші улюблені продукти:', {
@@ -23,7 +25,9 @@ export class FoodPreferenceService {
         const user = await this.userService.findByChatId(chatId);
         const foods = user?.dislikedFoods || [];
 
-        const inlineKeyboard = foods.map((food) => [{ text: padRight(food), callback_data: `remove_dis:${food}` }]);
+        const inlineKeyboard = foods.map((food, i) => [
+            { text: padRight(food), callback_data: `remove_dis_i:${i}` },
+        ]);
         inlineKeyboard.push([{ text: '➕ Додати нові', callback_data: 'add_dis' }]);
 
         bot.sendMessage(chatId, 'Ваші небажані продукти:', {

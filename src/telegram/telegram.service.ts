@@ -223,6 +223,28 @@ _Виключити продукти / страви з меню_  /del\\_food
             } else if (data.startsWith('goal:')) {
                 await this.onboarding.handleGoal(this.bot, chatId, data, (s) => this.setUserState(chatId, s));
                 this.bot.answerCallbackQuery(query.id);
+            } else if (data.startsWith('remove_fav_i:')) {
+                const idx = parseInt(data.split(':')[1], 10);
+                const user = await this.userService.findByChatId(chatId);
+                const food = user?.favoriteFoods?.[idx];
+                if (food) {
+                    await this.userService.removeFavoriteFood(chatId, food);
+                    this.bot.answerCallbackQuery(query.id, { text: `${food} видалено.` });
+                    this.foodPref.handleFavoriteFoods(this.bot, chatId);
+                } else {
+                    this.bot.answerCallbackQuery(query.id, { text: 'Не знайдено елемент.' });
+                }
+            } else if (data.startsWith('remove_dis_i:')) {
+                const idx = parseInt(data.split(':')[1], 10);
+                const user = await this.userService.findByChatId(chatId);
+                const food = user?.dislikedFoods?.[idx];
+                if (food) {
+                    await this.userService.removeDislikedFood(chatId, food);
+                    this.bot.answerCallbackQuery(query.id, { text: `${food} видалено.` });
+                    this.foodPref.handleDislikedFoods(this.bot, chatId);
+                } else {
+                    this.bot.answerCallbackQuery(query.id, { text: 'Не знайдено елемент.' });
+                }
             } else if (data.startsWith('remove_fav:')) {
                 const food = data.split(':')[1];
                 await this.userService.removeFavoriteFood(chatId, food);
