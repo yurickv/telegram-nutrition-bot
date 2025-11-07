@@ -8,7 +8,7 @@ export class FoodInputService {
 
     promptAddFoods(bot: TelegramBot, chatId: number, type: 'favorite' | 'disliked', setState: (s: string) => void) {
         const label = type === 'favorite' ? 'улюблені' : 'небажані';
-        bot.sendMessage(chatId, `Введіть ваші ${label} продукти через кому (до 30 символів кожен):`);
+        bot.sendMessage(chatId, `Введіть ваші ${label} продукти через кому (до 25 символів кожен):`);
         setState(type === 'favorite' ? 'adding_favorite_foods' : 'adding_disliked_foods');
     }
 
@@ -30,7 +30,7 @@ export class FoodInputService {
             });
 
         if (!foods.length) {
-            return bot.sendMessage(chatId, 'Немає допустимих продуктів.');
+            return bot.sendMessage(chatId, 'Введіть допустиму назву.');
         }
 
         const addMethod = type === 'favorite' ? this.userService.addFavoriteFoods : this.userService.addDislikedFoods;
