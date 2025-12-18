@@ -1,6 +1,20 @@
-import { Controller, Get, Post, Put, Delete, Query, Param, Body, HttpException, HttpStatus } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpException,
+    HttpStatus,
+    Param,
+    Post,
+    Put,
+    Query,
+    UsePipes,
+    ValidationPipe,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './user.schema';
+import { FindUsersQueryDto } from './dto/find-users-query.dto';
 
 @Controller('users')
 export class UserController {
@@ -8,8 +22,17 @@ export class UserController {
 
     // 🔍 Отримати всіх користувачів з пагінацією
     @Get()
-    async findAll(@Query('page') page = 1, @Query('limit') limit = 10) {
-        return this.userService.findAllPaginated(+page, +limit);
+    @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+    async findAll(@Query() query: FindUsersQueryDto) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 10;
+        return this.userService.findAllPaginated(
+            page,
+            limit,
+            query.firstInitFrom,
+            query.firstInitTo,
+            query.sortOrder,
+        );
     }
 
     // 🔍 Знайти по chatId

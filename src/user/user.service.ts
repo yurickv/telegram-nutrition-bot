@@ -43,6 +43,9 @@ export class UserService {
     async findAllPaginated(
         page = 1,
         limit = 10,
+        firstInitFrom?: string | Date,
+        firstInitTo?: string | Date,
+        sortOrder: 'asc' | 'desc' | string = 'asc',
     ): Promise<{
         data: UserDocument[];
         total: number;
@@ -50,10 +53,32 @@ export class UserService {
         limit: number;
     }> {
         const skip = (page - 1) * limit;
+        const filter: Record<string, unknown> = {};
+        const dateFilter: Record<string, Date> = {};
+        const toValidDate = (value?: string | Date) => {
+            if (!value) {
+                return undefined;
+            }
+            const date = value instanceof Date ? value : new Date(value);
+            return Number.isNaN(date.valueOf()) ? undefined : date;
+        };
+        const fromDate = toValidDate(firstInitFrom);
+        const toDate = toValidDate(firstInitTo);
+        if (fromDate) {
+            dateFilter.$gte = fromDate;
+        }
+        if (toDate) {
+            dateFilter.$lte = toDate;
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            filter.firstInit = dateFilter;
+        }
+        const normalizedSortOrder = typeof sortOrder === 'string' ? sortOrder.toLowerCase() : sortOrder;
+        const sortDirection = normalizedSortOrder === 'desc' ? -1 : 1;
 
         const [data, total] = await Promise.all([
-            this.userModel.find().skip(skip).limit(limit).exec(),
-            this.userModel.countDocuments(),
+            this.userModel.find(filter).sort({ firstInit: sortDirection }).skip(skip).limit(limit).exec(),
+            this.userModel.countDocuments(filter),
         ]);
 
         return {
