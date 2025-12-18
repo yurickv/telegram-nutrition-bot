@@ -73,11 +73,17 @@ export class UserService {
         if (Object.keys(dateFilter).length > 0) {
             filter.firstInit = dateFilter;
         }
-        const normalizedSortOrder = typeof sortOrder === 'string' ? sortOrder.toLowerCase() : sortOrder;
-        const sortDirection = normalizedSortOrder === 'desc' ? -1 : 1;
+
+        let query = this.userModel.find(filter);
+
+        if (sortOrder) {
+            const normalizedSortOrder = typeof sortOrder === 'string' ? sortOrder.toLowerCase() : sortOrder;
+            const sortDirection = normalizedSortOrder === 'desc' ? -1 : 1;
+            query = query.sort({ firstInit: sortDirection });
+        }
 
         const [data, total] = await Promise.all([
-            this.userModel.find(filter).sort({ firstInit: sortDirection }).skip(skip).limit(limit).exec(),
+            query.skip(skip).limit(limit).exec(),
             this.userModel.countDocuments(filter),
         ]);
 

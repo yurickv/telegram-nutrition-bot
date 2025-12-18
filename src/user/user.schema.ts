@@ -34,7 +34,7 @@ export class User {
     @Prop({ type: [String], default: [] })
     dislikedFoods: string[];
 
-    @Prop()
+    @Prop({ default: Date.now })
     firstInit: Date;
 
     @Prop({ type: Object, default: {} })
