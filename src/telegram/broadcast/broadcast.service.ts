@@ -54,6 +54,7 @@ export class BroadcastService {
             createdAt: Date.now(),
             timeout: setTimeout(() => this.expire(bot, chatId), DRAFT_TTL_MS),
         };
+        draft.timeout.unref?.();
         this.drafts.set(chatId, draft);
 
         await bot.sendMessage(

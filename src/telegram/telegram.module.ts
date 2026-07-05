@@ -7,6 +7,7 @@ import { FoodPreferenceService } from './food/food-preference.service';
 import { FoodInputService } from './food/food-input.service';
 import { OnboardingService } from './onboarding/onboarding.service';
 import { ConfirmationService } from './confirmation/confirmation.service';
+import { BroadcastService } from './broadcast/broadcast.service';
 import { TelegramController } from './telegram.controller';
 
 @Module({
@@ -18,6 +19,7 @@ import { TelegramController } from './telegram.controller';
         OnboardingService,
         ConfirmationService,
         FoodPreferenceService,
+        BroadcastService,
     ],
     controllers: [TelegramController],
     exports: [TelegramService],

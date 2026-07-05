@@ -10,6 +10,8 @@ import { FoodInputService } from './food/food-input.service';
 import { isUserDataValid } from 'src/utils/validateUserData';
 import { calculateCalories } from 'src/utils/calcColories';
 import { User } from 'src/user/user.schema';
+import { BroadcastService } from './broadcast/broadcast.service';
+import { appButton } from 'src/utils/appButton';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -19,7 +21,7 @@ export class TelegramService implements OnModuleInit {
     private userStates = new Map<number, string>();
 
     private mainKeyboard: TelegramBot.ReplyKeyboardMarkup = {
-        keyboard: [[{ text: '📋 Меню' }, { text: 'ℹ️ Допомога' }]],
+        keyboard: [[{ text: '📋 Меню' }, { text: 'ℹ️ Допомога' }], [{ text: '🥗 Застосунок' }]],
         resize_keyboard: true,
         one_time_keyboard: false,
     };
@@ -32,6 +34,7 @@ export class TelegramService implements OnModuleInit {
         private confirm: ConfirmationService,
         private foodPref: FoodPreferenceService,
         private foodInput: FoodInputService,
+        private broadcast: BroadcastService,
     ) {}
 
     async onModuleInit() {
@@ -57,6 +60,7 @@ export class TelegramService implements OnModuleInit {
         const commandHandler = (regex: RegExp, handler: (msg: TelegramBot.Message) => void) => {
             this.bot.onText(regex, (msg) => {
                 this.clearUserState(msg.chat.id);
+                this.broadcast.cancelPending(this.bot, msg.chat.id);
                 handler(msg);
             });
         };
@@ -105,6 +109,13 @@ export class TelegramService implements OnModuleInit {
                         }),
                     1000,
                 );
+                setTimeout(
+                    () =>
+                        this.bot.sendMessage(chatId, '🥗 Спробуйте застосунок Nutriday:', {
+                            reply_markup: appButton('cta'),
+                        }),
+                    1500,
+                );
             }
         });
 
@@ -131,10 +142,19 @@ export class TelegramService implements OnModuleInit {
             );
         });
 
+        this.bot.onText(/\/broadcast/, (msg) => this.broadcast.start(this.bot, msg.chat.id));
+
         this.bot.on('message', async (msg) => {
             const chatId = msg.chat.id;
             const text = msg.text?.trim();
             const state = this.userStates.get(chatId);
+
+            void this.userService.resetBlockedIfFlagged(chatId);
+
+            const isCommand = !!msg.text?.startsWith('/');
+            if (!isCommand && this.broadcast.isAwaitingContent(chatId)) {
+                return this.broadcast.handleContent(this.bot, msg);
+            }
 
             // If user entered a command, cancel state
             if (text?.startsWith('/') && state) {
@@ -144,8 +164,15 @@ export class TelegramService implements OnModuleInit {
 
             // Handle persistent keyboard buttons
             if (text === '📋 Меню') return await this.sendMenu(chatId);
-            if (text === 'ℹ️ Допомога') {
+            if (text === '🥗 Застосунок') {
                 return this.bot.sendMessage(
+                    chatId,
+                    '🥗 Новий застосунок Nutriday: меню на тиждень, заміна страв, список покупок, підрахунок БЖВ.',
+                    { reply_markup: appButton('cta') },
+                );
+            }
+            if (text === 'ℹ️ Допомога') {
+                await this.bot.sendMessage(
                     chatId,
                     `📊 Врахування калорійності❗— це ключ🔧 до ефективного схуднення або набору ваги.
 
@@ -173,6 +200,9 @@ _Виключити продукти / страви з меню_  /del\\_food
                         reply_markup: this.mainKeyboard,
                     },
                 );
+                return this.bot.sendMessage(chatId, '🥗 Більше можливостей у застосунку Nutriday:', {
+                    reply_markup: appButton('cta'),
+                });
             }
 
             // Handle user input based on current state
@@ -215,6 +245,12 @@ _Виключити продукти / страви з меню_  /del\\_food
         this.bot.on('callback_query', async (query) => {
             const chatId = query.message.chat.id;
             const data = query.data;
+
+            void this.userService.resetBlockedIfFlagged(chatId);
+
+            if (data === 'broadcast:confirm' || data === 'broadcast:cancel') {
+                return this.broadcast.handleCallback(this.bot, query);
+            }
 
             if (data.startsWith('gender:')) {
                 await this.onboarding.handleGender(this.bot, chatId, data, (s) => this.setUserState(chatId, s));
@@ -298,6 +334,7 @@ _Виключити продукти / страви з меню_  /del\\_food
             this.bot.editMessageText(`Ваше меню на день:\n${mealPlan}`, {
                 chat_id: chatId,
                 message_id: loading.message_id,
+                reply_markup: appButton('cta'),
             });
 
             const updateData: Partial<User> = {
