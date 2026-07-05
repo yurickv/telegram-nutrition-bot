@@ -161,3 +161,51 @@ describe('BroadcastService runBroadcast', () => {
         expect(bot.sendMessage).toHaveBeenLastCalledWith(ADMIN, expect.stringContaining('Розсилку завершено'));
     });
 });
+
+describe('BroadcastService lifecycle', () => {
+    it('cancel discards the draft and confirms to admin', async () => {
+        const { service } = makeService();
+        const bot = makeBot();
+        await service.start(bot, ADMIN);
+        await service.handleContent(bot, { chat: { id: ADMIN }, text: 'hi' } as any);
+        await service.handleCallback(bot, { id: 'q', message: { chat: { id: ADMIN } }, data: 'broadcast:cancel' } as any);
+        expect((service as any).drafts.has(ADMIN)).toBe(false);
+        expect(bot.answerCallbackQuery).toHaveBeenCalledWith('q');
+        expect(bot.sendMessage).toHaveBeenLastCalledWith(ADMIN, expect.stringContaining('скасовано'));
+    });
+
+    it('confirm sets sending state and acks start', async () => {
+        const { service, userService } = makeService();
+        userService.findActiveForBroadcast.mockResolvedValue([]); // empty => run finishes immediately
+        const bot = makeBot();
+        await service.start(bot, ADMIN);
+        await service.handleContent(bot, { chat: { id: ADMIN }, text: 'hi' } as any);
+        await service.handleCallback(bot, { id: 'q', message: { chat: { id: ADMIN } }, data: 'broadcast:confirm' } as any);
+        expect(bot.sendMessage).toHaveBeenCalledWith(ADMIN, expect.stringContaining('Розсилку почато'));
+    });
+
+    it('a second confirm while sending is ignored', async () => {
+        const { service } = makeService();
+        const bot = makeBot();
+        (service as any).drafts.set(ADMIN, { state: 'sending', createdAt: Date.now(), timeout: setTimeout(() => {}, 0) });
+        await service.handleCallback(bot, { id: 'q', message: { chat: { id: ADMIN } }, data: 'broadcast:confirm' } as any);
+        expect(bot.sendMessage).not.toHaveBeenCalledWith(ADMIN, expect.stringContaining('Розсилку почато'));
+    });
+
+    it('start while sending tells admin to wait', async () => {
+        const { service } = makeService();
+        const bot = makeBot();
+        (service as any).drafts.set(ADMIN, { state: 'sending', createdAt: Date.now(), timeout: setTimeout(() => {}, 0) });
+        await service.start(bot, ADMIN);
+        expect(bot.sendMessage).toHaveBeenCalledWith(ADMIN, expect.stringContaining('вже виконується'));
+    });
+
+    it('cancelPending drops a non-sending draft', () => {
+        const { service } = makeService();
+        const bot = makeBot();
+        (service as any).drafts.set(ADMIN, { state: 'awaiting_content', createdAt: Date.now(), timeout: setTimeout(() => {}, 0) });
+        service.cancelPending(bot, ADMIN);
+        expect((service as any).drafts.has(ADMIN)).toBe(false);
+        expect(bot.sendMessage).toHaveBeenCalledWith(ADMIN, expect.stringContaining('скасовано'));
+    });
+});

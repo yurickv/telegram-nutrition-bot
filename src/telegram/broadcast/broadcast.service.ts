@@ -90,6 +90,41 @@ export class BroadcastService {
         await this.sendPreview(bot, chatId, draft);
     }
 
+    async handleCallback(bot: TelegramBot, query: TelegramBot.CallbackQuery): Promise<void> {
+        const chatId = query.message!.chat.id;
+        await bot.answerCallbackQuery(query.id);
+
+        const draft = this.drafts.get(chatId);
+        if (!draft) return;
+
+        if (query.data === 'broadcast:cancel') {
+            this.discard(chatId);
+            await bot.sendMessage(chatId, '❌ Розсилку скасовано.');
+            return;
+        }
+
+        if (query.data === 'broadcast:confirm') {
+            if (draft.state !== 'awaiting_confirm') return; // ignore double-tap / mid-send
+            draft.state = 'sending';
+            clearTimeout(draft.timeout);
+
+            const n = await this.userService.countActiveForBroadcast();
+            await bot.sendMessage(chatId, `🚀 Розсилку почато (${n})...`);
+
+            // fire-and-forget
+            void this.runBroadcast(bot, chatId, draft).finally(() => this.drafts.delete(chatId));
+        }
+    }
+
+    cancelPending(bot: TelegramBot, chatId: number): void {
+        const draft = this.drafts.get(chatId);
+        if (draft && draft.state !== 'sending') {
+            clearTimeout(draft.timeout);
+            this.drafts.delete(chatId);
+            void bot.sendMessage(chatId, '❌ Чернетку розсилки скасовано.');
+        }
+    }
+
     private async sendPreview(bot: TelegramBot, chatId: number, draft: BroadcastDraft): Promise<void> {
         // 1) exact copy as users will see it
         if (draft.photoFileId) {
