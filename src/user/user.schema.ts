@@ -46,6 +46,12 @@ export class User {
     amountMenuToday: number;
     @Prop()
     lastMenuRequest: Date;
+
+    @Prop({ default: false })
+    isBlocked: boolean;
+
+    @Prop()
+    blockedAt: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -40,6 +40,22 @@ export class UserService {
         await this.userModel.findOneAndUpdate({ chatId }, { $pull: { dislikedFoods: food } }, { new: true }).exec();
     }
 
+    async findActiveForBroadcast(): Promise<UserDocument[]> {
+        return this.userModel.find({ amountMenu: { $gt: 0 }, isBlocked: { $ne: true } }).exec();
+    }
+
+    async countActiveForBroadcast(): Promise<number> {
+        return this.userModel.countDocuments({ amountMenu: { $gt: 0 }, isBlocked: { $ne: true } });
+    }
+
+    async markBlocked(chatId: number): Promise<void> {
+        await this.userModel.updateOne({ chatId }, { $set: { isBlocked: true, blockedAt: new Date() } }).exec();
+    }
+
+    async resetBlockedIfFlagged(chatId: number): Promise<void> {
+        await this.userModel.updateOne({ chatId, isBlocked: true }, { $set: { isBlocked: false } }).exec();
+    }
+
     async findAllPaginated(
         page = 1,
         limit = 10,
