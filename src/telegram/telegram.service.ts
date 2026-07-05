@@ -14,6 +14,7 @@ import { User } from 'src/user/user.schema';
 @Injectable()
 export class TelegramService implements OnModuleInit {
     private bot: TelegramBot;
+    private adminChatId: number;
     private processingUsers = new Set<number>();
     private userStates = new Map<number, string>();
 
@@ -34,6 +35,7 @@ export class TelegramService implements OnModuleInit {
     ) {}
 
     async onModuleInit() {
+        this.adminChatId = Number(this.configService.get<string>('ADMIN_CHAT_ID'));
         const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
         const domain = this.configService.get<string>('RENDER_EXTERNAL_URL');
         if (this.configService.get<string>('NODE_ENV') === 'development') {
@@ -202,7 +204,7 @@ _Виключити продукти / страви з меню_  /del\\_food
                         );
                     }
                     await this.bot.sendMessage(
-                        7456685492,
+                        this.adminChatId,
                         `📨 Новий фідбек від @${msg.from?.username || 'невідомо'}:\n\n${feedback}`,
                     );
                     this.bot.sendMessage(chatId, '✅ Дякуємо! Ваше повідомлення надіслано розробнику.');
