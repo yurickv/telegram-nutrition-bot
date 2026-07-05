@@ -95,3 +95,69 @@ describe('BroadcastService content capture', () => {
         expect((service as any).drafts.has(ADMIN)).toBe(false);
     });
 });
+
+describe('BroadcastService runBroadcast', () => {
+    const rejectWith = (code: number, extra: any = {}) => ({ response: { body: { error_code: code, ...extra } } });
+
+    it('sends to all, marks 403 as blocked, retries 429, reports tallies', async () => {
+        const { service, userService } = makeService();
+        userService.findActiveForBroadcast.mockResolvedValue([{ chatId: 1 }, { chatId: 2 }, { chatId: 3 }]);
+        const bot = makeBot();
+        bot.sendMessage
+            .mockResolvedValueOnce({}) // user 1 ok
+            .mockRejectedValueOnce(rejectWith(403, { description: 'bot was blocked by the user' })) // user 2 blocked
+            .mockRejectedValueOnce(rejectWith(429, { parameters: { retry_after: 0 } })) // user 3 rate-limited
+            .mockResolvedValueOnce({}); // user 3 retry ok
+
+        const draft = { state: 'sending', text: 'hi', createdAt: Date.now(), timeout: setTimeout(() => {}, 0) } as any;
+        const report = await (service as any).runBroadcast(bot, ADMIN, draft);
+
+        expect(report).toEqual(expect.objectContaining({ total: 3, sent: 2, blocked: 1, failed: 0 }));
+        expect(userService.markBlocked).toHaveBeenCalledWith(2);
+        expect(userService.markBlocked).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks 400 chat-not-found as blocked', async () => {
+        const { service, userService } = makeService();
+        userService.findActiveForBroadcast.mockResolvedValue([{ chatId: 8 }]);
+        const bot = makeBot();
+        bot.sendMessage.mockRejectedValueOnce(rejectWith(400, { description: 'Bad Request: chat not found' }));
+
+        const draft = { state: 'sending', text: 'hi', createdAt: Date.now(), timeout: setTimeout(() => {}, 0) } as any;
+        const report = await (service as any).runBroadcast(bot, ADMIN, draft);
+
+        expect(report.blocked).toBe(1);
+        expect(userService.markBlocked).toHaveBeenCalledWith(8);
+    });
+
+    it('counts a 500 as failed without marking blocked', async () => {
+        const { service, userService } = makeService();
+        userService.findActiveForBroadcast.mockResolvedValue([{ chatId: 9 }]);
+        const bot = makeBot();
+        bot.sendMessage.mockRejectedValueOnce(rejectWith(500, { description: 'Internal Server Error' }));
+
+        const draft = { state: 'sending', text: 'hi', createdAt: Date.now(), timeout: setTimeout(() => {}, 0) } as any;
+        const report = await (service as any).runBroadcast(bot, ADMIN, draft);
+
+        expect(report.failed).toBe(1);
+        expect(userService.markBlocked).not.toHaveBeenCalled();
+    });
+
+    it('sends a photo broadcast when the draft has a photo', async () => {
+        const { service, userService } = makeService();
+        userService.findActiveForBroadcast.mockResolvedValue([{ chatId: 1 }]);
+        const bot = makeBot();
+        const draft = { state: 'sending', photoFileId: 'pic', caption: 'cap', createdAt: Date.now(), timeout: setTimeout(() => {}, 0) } as any;
+        await (service as any).runBroadcast(bot, ADMIN, draft);
+        expect(bot.sendPhoto).toHaveBeenCalledWith(1, 'pic', expect.objectContaining({ caption: 'cap' }));
+    });
+
+    it('posts a final report to the admin', async () => {
+        const { service, userService } = makeService();
+        userService.findActiveForBroadcast.mockResolvedValue([{ chatId: 1 }]);
+        const bot = makeBot();
+        const draft = { state: 'sending', text: 'hi', createdAt: Date.now(), timeout: setTimeout(() => {}, 0) } as any;
+        await (service as any).runBroadcast(bot, ADMIN, draft);
+        expect(bot.sendMessage).toHaveBeenLastCalledWith(ADMIN, expect.stringContaining('Розсилку завершено'));
+    });
+});

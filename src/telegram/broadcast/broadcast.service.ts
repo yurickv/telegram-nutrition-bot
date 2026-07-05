@@ -134,4 +134,91 @@ export class BroadcastService {
         this.drafts.delete(chatId);
         await bot.sendMessage(chatId, '⌛️ Час на підготовку розсилки вийшов. Чернетку скасовано.');
     }
+
+    private async runBroadcast(
+        bot: TelegramBot,
+        chatId: number,
+        draft: BroadcastDraft,
+    ): Promise<{ total: number; sent: number; blocked: number; failed: number; durationMs: number }> {
+        const started = Date.now();
+        const users = await this.userService.findActiveForBroadcast();
+        const report = { total: users.length, sent: 0, blocked: 0, failed: 0, durationMs: 0 };
+
+        for (const user of users) {
+            try {
+                await this.sendOne(bot, user.chatId, draft);
+                report.sent++;
+            } catch (err) {
+                const retryAfter = this.retryAfterSeconds(err);
+                if (retryAfter !== null) {
+                    await this.sleep(retryAfter * 1000);
+                    try {
+                        await this.sendOne(bot, user.chatId, draft);
+                        report.sent++;
+                    } catch (retryErr) {
+                        await this.classifyFailure(retryErr, user.chatId, report);
+                    }
+                } else {
+                    await this.classifyFailure(err, user.chatId, report);
+                }
+            }
+            await this.sleep(this.throttleMs);
+        }
+
+        report.durationMs = Date.now() - started;
+
+        await bot.sendMessage(
+            chatId,
+            `📊 Розсилку завершено\n` +
+                `Всього: ${report.total}\n` +
+                `✅ Надіслано: ${report.sent}\n` +
+                `🚫 Заблоковано: ${report.blocked}\n` +
+                `⚠️ Помилок: ${report.failed}\n` +
+                `⏱ Тривалість: ${Math.round(report.durationMs / 1000)}с`,
+        );
+
+        return report;
+    }
+
+    private async sendOne(bot: TelegramBot, targetChatId: number, draft: BroadcastDraft): Promise<void> {
+        if (draft.photoFileId) {
+            await bot.sendPhoto(targetChatId, draft.photoFileId, {
+                caption: draft.caption,
+                reply_markup: appButton('invite'),
+            });
+        } else {
+            await bot.sendMessage(targetChatId, draft.text!, { reply_markup: appButton('invite') });
+        }
+    }
+
+    private async classifyFailure(
+        err: unknown,
+        targetChatId: number,
+        report: { blocked: number; failed: number },
+    ): Promise<void> {
+        if (this.isBlockedError(err)) {
+            await this.userService.markBlocked(targetChatId);
+            report.blocked++;
+        } else {
+            report.failed++;
+            console.error(`Broadcast send failed for ${targetChatId}:`, err);
+        }
+    }
+
+    private isBlockedError(err: unknown): boolean {
+        const body = (err as any)?.response?.body;
+        if (!body) return false;
+        if (body.error_code === 403) return true;
+        return body.error_code === 400 && /chat not found/i.test(body.description ?? '');
+    }
+
+    private retryAfterSeconds(err: unknown): number | null {
+        const body = (err as any)?.response?.body;
+        if (body?.error_code === 429) return body.parameters?.retry_after ?? 1;
+        return null;
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
 }
