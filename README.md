@@ -1,4 +1,4 @@
-# 🥗 Telegram Nutrition Bot
+# 🥗 Sytno — Telegram-бот
 
 AI-дієтолог у твоєму Telegram!  Знайдіть бота в Телеграм [@Nutri_day_bot](https://web.telegram.org/k/#@Nutri_day_bot)
 Цей бот аналізує твої фізичні дані, цілі та харчові вподобання, щоб згенерувати персоналізоване меню на день за допомогою OpenAI.

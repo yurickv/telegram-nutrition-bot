@@ -3,7 +3,7 @@ import { appButton, APP_URL_CTA, APP_URL_INVITE } from './appButton';
 describe('appButton', () => {
     it('builds a cta button by default', () => {
         const kb = appButton();
-        expect(kb.inline_keyboard[0][0].text).toBe('🥗 Відкрити Nutriday');
+        expect(kb.inline_keyboard[0][0].text).toBe('🥗 Відкрити Sytno');
         expect(kb.inline_keyboard[0][0].url).toBe(APP_URL_CTA);
     });
 

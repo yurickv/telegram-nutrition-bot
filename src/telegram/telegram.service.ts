@@ -111,7 +111,7 @@ export class TelegramService implements OnModuleInit {
                 );
                 setTimeout(
                     () =>
-                        this.bot.sendMessage(chatId, '🥗 Спробуйте застосунок Nutriday:', {
+                        this.bot.sendMessage(chatId, '🥗 Спробуйте застосунок Sytno:', {
                             reply_markup: appButton('cta'),
                         }),
                     1500,
@@ -167,7 +167,7 @@ export class TelegramService implements OnModuleInit {
             if (text === '🥗 Застосунок') {
                 return this.bot.sendMessage(
                     chatId,
-                    '🥗 Новий застосунок Nutriday: меню на тиждень, заміна страв, список покупок, підрахунок БЖВ.',
+                    '🥗 Новий застосунок Sytno: меню на тиждень, заміна страв, список покупок, підрахунок БЖВ.',
                     { reply_markup: appButton('cta') },
                 );
             }
@@ -200,7 +200,7 @@ _Виключити продукти / страви з меню_  /del\\_food
                         reply_markup: this.mainKeyboard,
                     },
                 );
-                return this.bot.sendMessage(chatId, '🥗 Більше можливостей у застосунку Nutriday:', {
+                return this.bot.sendMessage(chatId, '🥗 Більше можливостей у застосунку Sytno:', {
                     reply_markup: appButton('cta'),
                 });
             }

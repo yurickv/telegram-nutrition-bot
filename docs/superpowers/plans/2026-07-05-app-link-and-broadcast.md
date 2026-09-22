@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an inline URL button to the Nutriday web app across several bot touchpoints, and build a reusable admin `/broadcast` mechanism that sends text/photo announcements to active users with throttling, blocked-user marking, and a delivery report.
+**Goal:** Add an inline URL button to the Sytno web app across several bot touchpoints, and build a reusable admin `/broadcast` mechanism that sends text/photo announcements to active users with throttling, blocked-user marking, and a delivery report.
 
 **Architecture:** A shared `appButton()` helper produces the inline URL keyboard. A new `BroadcastService` (in the telegram module) encapsulates the admin draft→preview→confirm→send flow; it receives the `bot` instance as a method parameter (matching the existing `OnboardingService`/`FoodInputService` pattern) so there is no circular dependency with `TelegramService`. `TelegramService` delegates to it from its single `message`/`callback_query` handlers — no new global `bot.on(...)` listeners (unlike `SurveyService`). The `User` schema gains an `isBlocked` flag driving audience filtering.
 
@@ -13,7 +13,7 @@
 - Admin is identified by `ADMIN_CHAT_ID` from `.env`, read via `ConfigService`. The existing hardcoded feedback recipient `7456685492` must migrate to this single source.
 - "Active user" = `amountMenu > 0` AND `isBlocked !== true`. Exact query: `{ amountMenu: { $gt: 0 }, isBlocked: { $ne: true } }`.
 - Broadcast content: plain text (no `parse_mode`), max 4096 chars for text, max 1024 chars for photo caption. Only text OR a single photo+caption — reject video/documents/albums.
-- App button label: `🥗 Відкрити Nutriday`. Reply-keyboard button label: `🥗 Застосунок`.
+- App button label: `🥗 Відкрити Sytno`. Reply-keyboard button label: `🥗 Застосунок`.
 - URLs (exact, verbatim):
   - CTA: `https://nutriday.com.ua/?utm_source=telegram&utm_medium=referral&utm_campaign=miniapp&utm_content=cta-button`
   - Invite: `https://nutriday.com.ua/?utm_source=telegram&utm_medium=referral&utm_campaign=miniapp`
@@ -34,7 +34,7 @@
 - Consumes: nothing.
 - Produces:
   - `APP_URL_CTA: string`, `APP_URL_INVITE: string`
-  - `appButton(variant?: 'cta' | 'invite'): TelegramBot.InlineKeyboardMarkup` — returns `{ inline_keyboard: [[{ text: '🥗 Відкрити Nutriday', url }]] }`. Default variant is `'cta'`.
+  - `appButton(variant?: 'cta' | 'invite'): TelegramBot.InlineKeyboardMarkup` — returns `{ inline_keyboard: [[{ text: '🥗 Відкрити Sytno', url }]] }`. Default variant is `'cta'`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -45,7 +45,7 @@ import { appButton, APP_URL_CTA, APP_URL_INVITE } from './appButton';
 describe('appButton', () => {
     it('builds a cta button by default', () => {
         const kb = appButton();
-        expect(kb.inline_keyboard[0][0].text).toBe('🥗 Відкрити Nutriday');
+        expect(kb.inline_keyboard[0][0].text).toBe('🥗 Відкрити Sytno');
         expect(kb.inline_keyboard[0][0].url).toBe(APP_URL_CTA);
     });
 
@@ -79,7 +79,7 @@ export const APP_URL_CTA = `${BASE_URL}&utm_content=cta-button`;
 export function appButton(variant: 'cta' | 'invite' = 'cta'): TelegramBot.InlineKeyboardMarkup {
     const url = variant === 'cta' ? APP_URL_CTA : APP_URL_INVITE;
     return {
-        inline_keyboard: [[{ text: '🥗 Відкрити Nutriday', url }]],
+        inline_keyboard: [[{ text: '🥗 Відкрити Sytno', url }]],
     };
 }
 ```
@@ -978,7 +978,7 @@ In the same `message` handler, next to the other keyboard-button checks (after t
             if (text === '🥗 Застосунок') {
                 return this.bot.sendMessage(
                     chatId,
-                    '🥗 Новий застосунок Nutriday: меню на тиждень, заміна страв, список покупок, підрахунок БЖВ.',
+                    '🥗 Новий застосунок Sytno: меню на тиждень, заміна страв, список покупок, підрахунок БЖВ.',
                     { reply_markup: appButton('cta') },
                 );
             }
@@ -1027,7 +1027,7 @@ _Виключити продукти / страви з меню_  /del\\_food
 `,
                     { parse_mode: 'Markdown', reply_markup: this.mainKeyboard },
                 );
-                return this.bot.sendMessage(chatId, '🥗 Більше можливостей у застосунку Nutriday:', {
+                return this.bot.sendMessage(chatId, '🥗 Більше можливостей у застосунку Sytno:', {
                     reply_markup: appButton('cta'),
                 });
             }
@@ -1038,7 +1038,7 @@ In the `/start` handler's **existing-user** branch (the `else` at lines 93-106),
 ```typescript
                 setTimeout(
                     () =>
-                        this.bot.sendMessage(chatId, '🥗 Спробуйте застосунок Nutriday:', {
+                        this.bot.sendMessage(chatId, '🥗 Спробуйте застосунок Sytno:', {
                             reply_markup: appButton('cta'),
                         }),
                     1500,
@@ -1121,7 +1121,7 @@ git commit -m "feat: wire app button touchpoints and /broadcast command into the
 
 Run the bot locally (`npm run start:dev`, `NODE_ENV=development` uses polling) and confirm:
 
-1. Reply keyboard shows `🥗 Застосунок`; tapping it sends a promo message with an inline `🥗 Відкрити Nutriday` button opening the CTA URL.
+1. Reply keyboard shows `🥗 Застосунок`; tapping it sends a promo message with an inline `🥗 Відкрити Sytno` button opening the CTA URL.
 2. `/menu` output has the app button underneath.
 3. `/start` (as a returning user) and `ℹ️ Допомога` each show the app button.
 4. As the admin (`ADMIN_CHAT_ID`): `/broadcast` → send text → preview + "Надіслати N…" → Confirm → start ack + final report. Repeat with a photo+caption.
