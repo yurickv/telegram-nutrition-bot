@@ -12,6 +12,7 @@ import { calculateCalories } from 'src/utils/calcColories';
 import { User } from 'src/user/user.schema';
 import { BroadcastService } from './broadcast/broadcast.service';
 import { appButton } from 'src/utils/appButton';
+import { appAndChannelButtons, channelButton } from 'src/utils/channelButton';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -21,7 +22,10 @@ export class TelegramService implements OnModuleInit {
     private userStates = new Map<number, string>();
 
     private mainKeyboard: TelegramBot.ReplyKeyboardMarkup = {
-        keyboard: [[{ text: '📋 Меню' }, { text: 'ℹ️ Допомога' }], [{ text: '🥗 Застосунок' }]],
+        keyboard: [
+            [{ text: '📋 Меню' }, { text: 'ℹ️ Допомога' }],
+            [{ text: '🥗 Застосунок' }, { text: '📣 Канал' }],
+        ],
         resize_keyboard: true,
         one_time_keyboard: false,
     };
@@ -111,8 +115,8 @@ export class TelegramService implements OnModuleInit {
                 );
                 setTimeout(
                     () =>
-                        this.bot.sendMessage(chatId, '🥗 Спробуйте застосунок Sytno:', {
-                            reply_markup: appButton('cta'),
+                        this.bot.sendMessage(chatId, '🥗 Застосунок Sytno і канал з порадами та новинами:', {
+                            reply_markup: appAndChannelButtons(),
                         }),
                     1500,
                 );
@@ -169,6 +173,13 @@ export class TelegramService implements OnModuleInit {
                     chatId,
                     '🥗 Новий застосунок Sytno: меню на тиждень, заміна страв, список покупок, підрахунок БЖВ.',
                     { reply_markup: appButton('cta') },
+                );
+            }
+            if (text === '📣 Канал') {
+                return this.bot.sendMessage(
+                    chatId,
+                    '📣 Канал Sytno: поради з харчування, рецепти та новини застосунку.',
+                    { reply_markup: channelButton() },
                 );
             }
             if (text === 'ℹ️ Допомога') {
