@@ -13,6 +13,7 @@ import { User } from 'src/user/user.schema';
 import { BroadcastService } from './broadcast/broadcast.service';
 import { appButton } from 'src/utils/appButton';
 import { appAndChannelButtons, channelButton } from 'src/utils/channelButton';
+import { withRetry } from 'src/utils/withRetry';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -49,17 +50,29 @@ export class TelegramService implements OnModuleInit {
             this.bot = new TelegramBot(token, { polling: true });
         } else {
             this.bot = new TelegramBot(token, { webHook: { port: false } });
-            await this.bot.setWebHook(`${domain}/bot`);
+            // Transient network errors to api.telegram.org must not kill the process:
+            // the webhook URL from the previous deploy stays registered anyway.
+            await withRetry(() => this.bot.setWebHook(`${domain}/bot`), {
+                attempts: 5,
+                baseDelayMs: 2000,
+                onRetry: (err, attempt, delayMs) =>
+                    console.warn(
+                        `setWebHook attempt ${attempt} failed, retrying in ${delayMs}ms:`,
+                        (err as Error)?.message,
+                    ),
+            }).catch((err) => console.error('setWebHook failed after retries:', err));
         }
 
-        this.bot.setMyCommands([
-            { command: '/start', description: 'Розпочати' },
-            { command: '/menu', description: 'Отримати меню' },
-            { command: '/edit', description: 'Редагувати дані' },
-            { command: '/add_favorite', description: 'Додати улюблені продукти' },
-            { command: '/del_food', description: 'Виключити небажані продукти' },
-            { command: '/feedback', description: 'Написати розробнику' },
-        ]);
+        this.bot
+            .setMyCommands([
+                { command: '/start', description: 'Розпочати' },
+                { command: '/menu', description: 'Отримати меню' },
+                { command: '/edit', description: 'Редагувати дані' },
+                { command: '/add_favorite', description: 'Додати улюблені продукти' },
+                { command: '/del_food', description: 'Виключити небажані продукти' },
+                { command: '/feedback', description: 'Написати розробнику' },
+            ])
+            .catch((err) => console.error('setMyCommands failed:', err));
 
         const commandHandler = (regex: RegExp, handler: (msg: TelegramBot.Message) => void) => {
             this.bot.onText(regex, (msg) => {
